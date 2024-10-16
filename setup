@@ -1,0 +1,4 @@
+#!/bin/bash
+
+ln -s "${HOME}/Scripts/utils/jnl" "${HOME}/bin/jnl"
+ln -s "${HOME}/Scripts/utils/share" "${HOME}/bin/share"

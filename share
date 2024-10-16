@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Make it easy to send the last screenshot I took to my 
+# public container on the OVHCloud object storage,
+# it also copies the full url to the clipboard.
+
+origin_path="${HOME}/Pictures/Screenshots"
+dest_path="${HOME}/Pictures/Shared"
+log_file="${HOME}/Pictures/shares.log"
+
+rclone_remote="brtel_ovh_storage"
+storage_path="cyrille_public"
+ovh_endpoint=$(pass show ovh_endpoint)
+base_url="${ovh_endpoint}/${storage_path}"
+
+last=$(ls -t "${origin_path}" | head -n 1)
+
+datetime=$(date "+%Y%m%d%H%M%S")
+random_string=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 80)
+filename="${datetime}_${random_string}.png"
+
+cp "${origin_path}/${last}" "${dest_path}"
+mv "${dest_path}/${last}" "${dest_path}/${filename}"
+
+rclone copy "${dest_path}/${filename}" "${rclone_remote}:${storage_path}"
+
+full_url="${base_url}/${filename}"
+echo "${full_url}" > "${log_file}"
+echo "${full_url}" | wl-copy
+exit 0

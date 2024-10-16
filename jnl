@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Log anything to my weekly journal (Obsidian)
+
+txt=$1
+week=$(date "+%U")
+week=$((week + 1))
+week_file="${HOME}/Notes/Personal/Weeks/Week ${week}.md"
+touch "${week_file}"
+entry_time=$(date "+%d/%m/%Y %H:%M:%S")
+echo "------" >> "${week_file}"
+echo "${entry_time}" >> "${week_file}"
+echo "$1" >> "${week_file}"
+echo "" >>  "${week_file}"
