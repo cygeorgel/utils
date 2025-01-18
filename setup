@@ -2,3 +2,4 @@
 
 ln -s "${HOME}/Scripts/utils/jnl" "${HOME}/bin/jnl"
 ln -s "${HOME}/Scripts/utils/share" "${HOME}/bin/share"
+ln -s "${HOME}/Scripts/utils/mkpwd" "${HOME}/bin/mkpwd"
