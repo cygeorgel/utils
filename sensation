@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Sync local pictures of my boat Sensation 
+# to the matching folder on OVH storage
+
+origin_path="${HOME}/Pictures/Sensation"
+rclone_remote="brtel_ovh_storage"
+storage_path="cyrille_public/Pictures/Sensation"
+
+ovh_endpoint=$(pass show ovh_endpoint)
+base_url="${ovh_endpoint}/${storage_path}"
+
+rclone sync "${origin_path}" "${rclone_remote}:${storage_path}"
+
+echo ${base_url}
+exit 0

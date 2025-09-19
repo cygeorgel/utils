@@ -1,5 +1,8 @@
 #!/bin/bash
 
+mkdir -p "${HOME}/bin"
 ln -s "${HOME}/Scripts/utils/jnl" "${HOME}/bin/jnl"
 ln -s "${HOME}/Scripts/utils/share" "${HOME}/bin/share"
 ln -s "${HOME}/Scripts/utils/makepwd" "${HOME}/bin/makepwd"
+
+export PATH="${HOME}/bin:${PATH}"

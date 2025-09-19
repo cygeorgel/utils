@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# --- paths (edit if needed) ---
+
+MD_FILE="${HOME}/Notes/SV Sensation/Sailings/02. Sailing around Ireland - Summer 2025/17. Lenan Bay (Lough Swilly).md"
+IMG_DIR="${HOME}/Pictures/Sensation/02/17"
+
+# Base URL where the images are hosted (keep the trailing slash)
+BASE_URL="https://storage.gra.cloud.ovh.net/v1/AUTH_9c30d35f284f44b2bda08609e7c19f33/cyrille_public/Pictures/Sensation/02/17/"
+
+# Link label in the Markdown
+ALT_TEXT="Lenan Bay (Lough Swilly)"
+
+# --- functions ---
+urlencode() {
+  # URL-encode a filename (spaces, parentheses, etc.)
+  local s="$1" i c out=""
+  for (( i=0; i<${#s}; i++ )); do
+    c="${s:$i:1}"
+    case "$c" in
+      [a-zA-Z0-9._~-] ) out+="$c" ;;
+      * ) printf -v out '%s%%%02X' "$out" "'$c"
+    esac
+  done
+  printf '%s' "$out"
+}
+
+# --- safety backup ---
+ts="$(date +%Y%m%d-%H%M%S)"
+cp -- "$MD_FILE" "${MD_FILE}.bak-${ts}"
+
+# --- main ---
+# Enable case-insensitive globbing and avoid literal patterns when no match
+shopt -s nullglob nocaseglob
+
+# Accept common image extensions; adjust if you only want *.jpg strictly
+files=( "$IMG_DIR"/*.{jpg,jpeg,png} )
+
+# If you truly want ONLY .jpg files (case-insensitive), comment the line above
+# and uncomment this instead:
+# files=( "$IMG_DIR"/*.jpg )
+
+# Append a blank line before adding links (optional)
+printf '\n' >> "$MD_FILE"
+
+for f in "${files[@]}"; do
+  [[ -f "$f" ]] || continue
+  fname="$(basename -- "$f")"
+  encoded="$(urlencode "$fname")"
+  printf '![%s](%s%s)\n' "$ALT_TEXT" "$BASE_URL" "$encoded" >> "$MD_FILE"
+    printf '\n' >> "$MD_FILE"
+
+done
+
+echo "Appended ${#files[@]} image link(s) to: $MD_FILE"
+

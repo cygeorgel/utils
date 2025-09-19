@@ -1,0 +1,20 @@
+#!/bin/bash
+
+source ${HOME}/Scripts/utils/.env
+
+directories=(
+    "${HOME}/Documents"
+    "${HOME}/Notes"
+    "${HOME}/Pictures"
+    "${HOME}/Videos"
+)
+
+for directory in "${directories[@]}"; do
+    echo "Syncing directory ${directory}"
+    rsync -avH \
+        --exclude="${HOME}/Pictures/Screenshots" \
+        --exclude="${HOME}/Videos/Screencasts" \
+        "${directory}" "${user}@${host}:Backups/"
+done
+
+exit 0

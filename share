@@ -24,7 +24,7 @@ mv "${dest_path}/${last}" "${dest_path}/${filename}"
 
 rclone copy "${dest_path}/${filename}" "${rclone_remote}:${storage_path}"
 
-full_url="${base_url}/${filename}"
-echo "${full_url}" > "${log_file}"
-echo "${full_url}" | wl-copy
+full_link="![placeholder](${base_url}/${filename})"
+echo "${full_link}" > "${log_file}"
+echo "${full_link}" | wl-copy
 exit 0
