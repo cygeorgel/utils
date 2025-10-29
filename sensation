@@ -12,5 +12,6 @@ base_url="${ovh_endpoint}/${storage_path}"
 
 rclone sync "${origin_path}" "${rclone_remote}:${storage_path}"
 
-echo ${base_url}
+echo "${base_url}" | wl-copy
+echo "${base_url}"
 exit 0

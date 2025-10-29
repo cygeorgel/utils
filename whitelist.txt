@@ -1,0 +1,33 @@
+# Process Monitor Whitelist
+# Add trusted process names here (one per line)
+# These processes will not trigger alerts
+
+# System processes
+systemd
+init
+kthreadd
+ksoftirqd
+migration
+rcu_
+watchdog
+kworker
+
+# Common applications
+firefox
+chrome
+chromium
+thunderbird
+vlc
+gimp
+libreoffice
+code
+cursor
+
+# Development tools
+git
+docker
+kubectl
+terraform
+ansible
+
+# Add your trusted processes below this line

@@ -1,0 +1,46 @@
+#!/bin/bash
+
+directories=(
+    "${HOME}/Documents"
+    "${HOME}/Notes"
+    "${HOME}/Pictures"
+    "${HOME}/Videos"
+)
+
+remote="c7:Home"
+
+# Optional: exclude list
+excludes=(
+    "${HOME}/Pictures/Screenshots"
+    "${HOME}/Videos/Screencasts"
+)
+
+# Function to build --exclude arguments for rclone
+build_excludes() {
+    local args=()
+    for exclude in "${excludes[@]}"; do
+        # Transform full path into relative exclusion patterns if possible
+        relpath="${exclude#"${HOME}/"}"
+        args+=(--exclude "${relpath}")
+    done
+    echo "${args[@]}"
+}
+
+exclude_args=($(build_excludes))
+
+# Perform bisync for each directory
+for directory in "${directories[@]}"; do
+    echo "Bisyncing directory: ${directory}"
+
+    # Build relative path to mirror structure remotely
+    subdir="${directory#"${HOME}/"}"
+
+    # rclone bisync
+    rclone bisync \
+        "${directory}" "${remote}/${subdir}" \
+        -- resync \
+        "${exclude_args[@]}"
+done
+
+exit 0
+
