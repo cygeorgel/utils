@@ -1,0 +1,10 @@
+#!/bin/bash
+
+#src="${HOME}/Working/0516/cdr/phenix-csv-landline/202509/CDR_FixeV2_SO1804_20250901_00218.csv"
+src="${HOME}/Working/0516/cdr/phenix-csv-landline/202509/international.csv"
+
+dst_user="u294999"
+dst_host="${dst_user}.your-storagebox.de"
+dst_path="homestead/cdr/phenix-csv-landline/"
+
+scp -P 23 "${src}" "${dst_user}@${dst_host}:${dst_path}"

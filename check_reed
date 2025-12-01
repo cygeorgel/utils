@@ -1,0 +1,127 @@
+#!/bin/bash
+
+# Script to check URL status and execution time (10 requests)
+# URL is hardcoded
+
+URL="https://telecom0585-clients.bluerocktel.net/api/cfd/483nl1rPPvUSXaCrvhf5YcT8lmA2NAE1aZVX4t7MVI3YYzt6Q3LMmqLDUVRl1b303pdFbMKD2QzDH9Ac"
+NUM_REQUESTS=10
+DELAY=1
+
+echo "Testing URL: $URL"
+echo "Sending $NUM_REQUESTS requests (1 second delay between requests)..."
+echo ""
+
+# Arrays to store execution times
+declare -a TOTAL_TIMES
+declare -a DNS_TIMES
+declare -a CONNECT_TIMES
+declare -a SSL_TIMES
+declare -a SERVER_TIMES
+declare -a TRANSFER_TIMES
+declare -a STATUS_CODES
+
+# Loop through requests
+for i in $(seq 1 $NUM_REQUESTS); do
+    # Make GET request and capture timing information
+    # Curl timing variables (in seconds):
+    # time_namelookup: DNS lookup time
+    # time_connect: Time to establish TCP connection
+    # time_appconnect: Time for SSL handshake (0 if HTTP)
+    # time_pretransfer: Time until file transfer was about to begin
+    # time_starttransfer: Time until first byte was transferred (server response)
+    # time_total: Total time
+    # size_download: Size of downloaded content in bytes
+    
+    CURL_OUTPUT=$(curl -s -o /dev/null -w "%{http_code}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_pretransfer}|%{time_starttransfer}|%{time_total}|%{size_download}" --max-time 30 "$URL")
+    
+    # Parse curl output
+    IFS='|' read -r HTTP_CODE TIME_NAMELOOKUP TIME_CONNECT TIME_APPCONNECT TIME_PRETRANSFER TIME_STARTTRANSFER TIME_TOTAL SIZE_DOWNLOAD <<< "$CURL_OUTPUT"
+    
+    # Calculate individual components (convert to milliseconds with 1 decimal precision)
+    DNS_TIME=$(awk "BEGIN {printf \"%.1f\", $TIME_NAMELOOKUP * 1000}")
+    CONNECT_TIME=$(awk "BEGIN {printf \"%.1f\", ($TIME_CONNECT - $TIME_NAMELOOKUP) * 1000}")
+    
+    # SSL time (only if appconnect > 0, meaning HTTPS)
+    if [ "$(awk "BEGIN {print ($TIME_APPCONNECT > 0)}")" = "1" ]; then
+        SSL_TIME=$(awk "BEGIN {printf \"%.1f\", ($TIME_APPCONNECT - $TIME_CONNECT) * 1000}")
+        SERVER_TIME=$(awk "BEGIN {printf \"%.1f\", ($TIME_STARTTRANSFER - $TIME_APPCONNECT) * 1000}")
+    else
+        SSL_TIME=0
+        SERVER_TIME=$(awk "BEGIN {printf \"%.1f\", ($TIME_STARTTRANSFER - $TIME_CONNECT) * 1000}")
+    fi
+    
+    # Transfer time: time from first byte to completion
+    TRANSFER_TIME=$(awk "BEGIN {printf \"%.1f\", ($TIME_TOTAL - $TIME_STARTTRANSFER) * 1000}")
+    TOTAL_TIME=$(awk "BEGIN {printf \"%.1f\", $TIME_TOTAL * 1000}")
+    
+    # Store results
+    TOTAL_TIMES[$i]=$TOTAL_TIME
+    DNS_TIMES[$i]=$DNS_TIME
+    CONNECT_TIMES[$i]=$CONNECT_TIME
+    SSL_TIMES[$i]=$SSL_TIME
+    SERVER_TIMES[$i]=$SERVER_TIME
+    TRANSFER_TIMES[$i]=$TRANSFER_TIME
+    STATUS_CODES[$i]=$HTTP_CODE
+    
+    # Output individual result
+    echo "Request $i: Status Code: $HTTP_CODE (Size: ${SIZE_DOWNLOAD} bytes)"
+    echo "  DNS Lookup: ${DNS_TIME}ms | Connect: ${CONNECT_TIME}ms | SSL: ${SSL_TIME}ms | Server Processing: ${SERVER_TIME}ms | Transfer: ${TRANSFER_TIME}ms | Total: ${TOTAL_TIME}ms"
+    
+    # Sleep 1 second between requests (except after last request)
+    if [ $i -lt $NUM_REQUESTS ]; then
+        sleep $DELAY
+    fi
+done
+
+echo ""
+
+# Calculate averages for all timing components using awk (to handle decimals)
+TOTAL_SUM=0
+DNS_SUM=0
+CONNECT_SUM=0
+SSL_SUM=0
+SERVER_SUM=0
+TRANSFER_SUM=0
+
+for i in $(seq 1 $NUM_REQUESTS); do
+    TOTAL_SUM=$(awk "BEGIN {printf \"%.3f\", $TOTAL_SUM + ${TOTAL_TIMES[$i]}}")
+    DNS_SUM=$(awk "BEGIN {printf \"%.3f\", $DNS_SUM + ${DNS_TIMES[$i]}}")
+    CONNECT_SUM=$(awk "BEGIN {printf \"%.3f\", $CONNECT_SUM + ${CONNECT_TIMES[$i]}}")
+    SSL_SUM=$(awk "BEGIN {printf \"%.3f\", $SSL_SUM + ${SSL_TIMES[$i]}}")
+    SERVER_SUM=$(awk "BEGIN {printf \"%.3f\", $SERVER_SUM + ${SERVER_TIMES[$i]}}")
+    TRANSFER_SUM=$(awk "BEGIN {printf \"%.3f\", $TRANSFER_SUM + ${TRANSFER_TIMES[$i]}}")
+done
+
+TOTAL_AVG=$(awk "BEGIN {printf \"%.1f\", $TOTAL_SUM / $NUM_REQUESTS}")
+DNS_AVG=$(awk "BEGIN {printf \"%.1f\", $DNS_SUM / $NUM_REQUESTS}")
+CONNECT_AVG=$(awk "BEGIN {printf \"%.1f\", $CONNECT_SUM / $NUM_REQUESTS}")
+SSL_AVG=$(awk "BEGIN {printf \"%.1f\", $SSL_SUM / $NUM_REQUESTS}")
+SERVER_AVG=$(awk "BEGIN {printf \"%.1f\", $SERVER_SUM / $NUM_REQUESTS}")
+TRANSFER_AVG=$(awk "BEGIN {printf \"%.1f\", $TRANSFER_SUM / $NUM_REQUESTS}")
+
+# Display summary
+echo "--- Summary ---"
+echo "Total Requests: $NUM_REQUESTS"
+echo "Average Times:"
+echo "  DNS Lookup: ${DNS_AVG}ms"
+echo "  Connect: ${CONNECT_AVG}ms"
+echo "  SSL Handshake: ${SSL_AVG}ms"
+echo "  Server Processing: ${SERVER_AVG}ms"
+echo "  Transfer: ${TRANSFER_AVG}ms"
+echo "  Total: ${TOTAL_AVG}ms"
+
+# Check if all requests were successful
+ALL_SUCCESS=true
+for code in "${STATUS_CODES[@]}"; do
+    if [ "$code" -ge 400 ]; then
+        ALL_SUCCESS=false
+        break
+    fi
+done
+
+# Exit with non-zero if any request failed
+if [ "$ALL_SUCCESS" = false ]; then
+    exit 1
+else
+    exit 0
+fi

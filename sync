@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Configuration
 directories=(
     "${HOME}/Documents"
     "${HOME}/Notes"
@@ -15,32 +16,148 @@ excludes=(
     "${HOME}/Videos/Screencasts"
 )
 
-# Function to build --exclude arguments for rclone
-build_excludes() {
-    local args=()
-    for exclude in "${excludes[@]}"; do
-        # Transform full path into relative exclusion patterns if possible
-        relpath="${exclude#"${HOME}/"}"
-        args+=(--exclude "${relpath}")
-    done
-    echo "${args[@]}"
+# Logging setup
+LOG_FILE="${HOME}/.local/share/sync.log"
+LOG_DIR="$(dirname "${LOG_FILE}")"
+
+# Ensure log directory exists
+mkdir -p "${LOG_DIR}"
+
+# Logging function
+log() {
+    local level="$1"
+    shift
+    local message="$*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[${timestamp}] [${level}] ${message}" | tee -a "${LOG_FILE}"
 }
 
-exclude_args=($(build_excludes))
+# Error tracking
+ERRORS=0
 
-# Perform bisync for each directory
-for directory in "${directories[@]}"; do
-    echo "Bisyncing directory: ${directory}"
+# Function to build --exclude arguments for rclone
+# Fixed: Properly handle array without breaking on spaces
+# Uses a global array variable to avoid array serialization issues
+build_exclude_args() {
+    EXCLUDE_ARGS=()
+    for exclude in "${excludes[@]}"; do
+        # Transform full path into relative exclusion patterns if possible
+        if [[ "${exclude}" == "${HOME}/"* ]]; then
+            relpath="${exclude#"${HOME}/"}"
+            EXCLUDE_ARGS+=(--exclude "${relpath}")
+        else
+            log "WARN" "Exclude path '${exclude}' is not under HOME, skipping"
+        fi
+    done
+}
+
+# Input validation
+validate_prerequisites() {
+    local failed=0
+
+    # Check if rclone is installed
+    if ! command -v rclone &> /dev/null; then
+        log "ERROR" "rclone is not installed or not in PATH"
+        failed=1
+    fi
+
+    # Check if remote is configured
+    if ! rclone listremotes | grep -q "^${remote%%:*}:"; then
+        log "ERROR" "Remote '${remote%%:*}' is not configured in rclone"
+        failed=1
+    fi
+
+    # Check if directories exist
+    for directory in "${directories[@]}"; do
+        if [[ ! -d "${directory}" ]]; then
+            log "WARN" "Directory '${directory}' does not exist, skipping"
+        fi
+    done
+
+    return ${failed}
+}
+
+# Perform bisync for a directory
+sync_directory() {
+    local directory="$1"
+    local force_resync="${2:-0}"
+
+    log "INFO" "Syncing directory: ${directory}"
 
     # Build relative path to mirror structure remotely
-    subdir="${directory#"${HOME}/"}"
+    local subdir="${directory#"${HOME}/"}"
 
-    # rclone bisync
-    rclone bisync \
-        "${directory}" "${remote}/${subdir}" \
-        -- resync \
-        "${exclude_args[@]}"
-done
+    # Build exclude arguments array properly
+    build_exclude_args
 
-exit 0
+    # Build rclone command
+    local rclone_cmd=(
+        rclone bisync
+        "${directory}"
+        "${remote}/${subdir}"
+    )
+
+    # Add --resync only if needed (force_resync=1 or after error)
+    if [[ "${force_resync}" -eq 1 ]]; then
+        rclone_cmd+=(--resync)
+        log "INFO" "Using --resync flag for ${directory}"
+    fi
+
+    # Add exclude arguments
+    rclone_cmd+=("${EXCLUDE_ARGS[@]}")
+
+    # Execute rclone bisync
+    if "${rclone_cmd[@]}"; then
+        log "INFO" "Successfully synced ${directory}"
+        return 0
+    else
+        local exit_code=$?
+        log "ERROR" "Failed to sync ${directory} (exit code: ${exit_code})"
+        return ${exit_code}
+    fi
+}
+
+# Main execution
+main() {
+    log "INFO" "Starting sync operation"
+
+    # Validate prerequisites
+    if ! validate_prerequisites; then
+        log "ERROR" "Prerequisites validation failed"
+        exit 1
+    fi
+
+    # Perform bisync for each directory
+    local first_sync=1
+    for directory in "${directories[@]}"; do
+        # Skip if directory doesn't exist
+        [[ ! -d "${directory}" ]] && continue
+
+        # Use resync only on first run or if previous sync failed
+        local use_resync=0
+        if [[ ${first_sync} -eq 1 ]]; then
+            use_resync=1
+            first_sync=0
+        fi
+
+        if ! sync_directory "${directory}" "${use_resync}"; then
+            ERRORS=$((ERRORS + 1))
+            # Try again with resync if first attempt failed
+            log "INFO" "Retrying ${directory} with --resync after failure"
+            sync_directory "${directory}" 1 || ERRORS=$((ERRORS + 1))
+        fi
+    done
+
+    # Final status
+    if [[ ${ERRORS} -eq 0 ]]; then
+        log "INFO" "Sync operation completed successfully"
+        exit 0
+    else
+        log "ERROR" "Sync operation completed with ${ERRORS} error(s)"
+        exit 1
+    fi
+}
+
+# Run main function
+main
 
