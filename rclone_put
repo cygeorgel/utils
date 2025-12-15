@@ -1,0 +1,5 @@
+#!/bin/bash
+
+scp -P 65022 ~/.config/rclone/rclone.conf fedora@worker-001.bluerock.tel:~/.config/rclone/
+scp -P 65022 ~/.config/rclone/rclone.conf fedora@worker-002.bluerock.tel:~/.config/rclone/
+
